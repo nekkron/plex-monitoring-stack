@@ -96,3 +96,9 @@ The following directories contain persistent data and are mounted from the host:
 - All services are configured with security best practices (no-new-privileges)
 - Services are set to restart unless explicitly stopped
 - This stack provides comprehensive monitoring for Plex server performance, resource usage, and streaming analytics
+
+## Further reading
+
+For a walk-through and explanation of the design and dashboards used by this stack, see the accompanying blog post:
+
+- ["Monitor your Plex Server like a Pro"](https://technotim.live/posts/monitor-your-plex-server-like-a-pro/)
