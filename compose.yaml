@@ -1,0 +1,153 @@
+services:
+  plex:
+    container_name: plex
+    image: plexinc/pms-docker:plexpass
+    pull_policy: always
+    restart: unless-stopped
+    env_file:
+      - ./plex/.env
+    gpus: all
+    ports:
+      - 32400:32400/tcp
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /transcode:size=8G
+    volumes:
+      - ${MEDIA_SERVER_PATH}/plex/config:/config      
+      - ${MEDIA_PATH}/movies:/movies:ro
+      - ${MEDIA_PATH}/recorded_tv:/recorded_tv
+
+  dozzle:
+    container_name: dozzle
+    image: amir20/dozzle:latest
+    pull_policy: always
+    restart: unless-stopped
+    env_file:
+      - ./dozzle/.env
+    ports:
+      - 8080:8080/tcp
+    security_opt:
+      - no-new-privileges:true
+    secrets:
+      - source: users
+        target: /data/users.yaml
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${MEDIA_SERVER_PATH}/dozzle/data:/data
+
+  prometheus-plex-exporter:
+    container_name: prometheus-plex-exporter
+    image: ghcr.io/timothystewart6/prometheus-plex-exporter:latest
+    pull_policy: always
+    restart: unless-stopped
+    depends_on:
+      - plex
+    env_file:
+      - ./plex-prometheus-exporter/.env
+    # ports:
+    # - 9000:9000/tcp
+    security_opt:
+      - no-new-privileges:true
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    pull_policy: always
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # Allows access to host network from container
+    env_file:
+      - ./prometheus/.env
+    user: "1000:1000"
+    ports:
+      - 9090:9090/tcp
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - ${MEDIA_SERVER_PATH}/prometheus/config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ${MEDIA_SERVER_PATH}/prometheus/config/rules:/etc/prometheus/rules:ro
+      - ${MEDIA_SERVER_PATH}/prometheus/data/:/prometheus
+
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=30d
+      - --web.enable-lifecycle    
+      - --web.enable-admin-api
+  node_exporter:
+    image: quay.io/prometheus/node-exporter:latest
+    container_name: node_exporter
+    pull_policy: always
+    restart: unless-stopped
+    network_mode: host
+    env_file:
+      - ./node-exporter/.env
+    # ports:
+    #   - 9100:9100
+    security_opt:
+      - no-new-privileges:true
+    command:
+      - '--path.rootfs=/host'
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.cpu.info'
+    pid: host
+    volumes:
+      - '/:/host:ro,rslave'
+  dcgm-exporter:
+    image: nvidia/dcgm-exporter:4.3.1-4.4.1-ubuntu22.04
+    container_name: dcgm-exporter
+    pull_policy: always
+    restart: unless-stopped
+    gpus: all
+    cap_add:
+      - SYS_ADMIN
+    security_opt:
+      - no-new-privileges:true
+    env_file:
+      - ./dcgm-exporter/.env
+    # ports:
+    #   - "9400:9400"
+  smartctl-exporter:
+    image: quay.io/prometheuscommunity/smartctl-exporter:latest
+    container_name: smartctl-exporter
+    pull_policy: always
+    restart: unless-stopped
+    privileged: true
+    user: root
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    pull_policy: always
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    env_file:
+      - ./grafana/.env
+    user: "1000:1000"
+    ports:
+      - 3000:3000/tcp
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - ${MEDIA_SERVER_PATH}/grafana/data:/var/lib/grafana
+      - ${MEDIA_SERVER_PATH}/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ${MEDIA_SERVER_PATH}/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    pull_policy: always
+    restart: unless-stopped
+    env_file:
+      - ./cadvisor/.env
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+
+secrets:
+  users:
+    file: ${MEDIA_SERVER_PATH}/dozzle/data/users.yaml

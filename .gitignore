@@ -1,0 +1,31 @@
+# Runtime data directories - these are mapped from outside the container
+prometheus/data/*
+grafana/data/*
+plex/config/*
+dozzle/data/admin/
+
+# Environment files (should be created locally)
+*/.env
+.env
+
+# Logs
+*.log
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Backup files
+*.bak
+*.tmp
